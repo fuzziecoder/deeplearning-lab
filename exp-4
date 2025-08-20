@@ -1,0 +1,38 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import SimpleRNN, Dense
+
+# Sample text data
+text = "hello world"
+chars = sorted(list(set(text)))
+char_to_idx = {ch: i for i, ch in enumerate(chars)}
+idx_to_char = {i: ch for ch, i in char_to_idx.items()}
+
+# Prepare data
+seq_length = 3
+X, y = [], []
+for i in range(len(text) - seq_length):
+    X.append([char_to_idx[c] for c in text[i:i + seq_length]])
+    y.append(char_to_idx[text[i + seq_length]])
+
+X = np.array(X)
+y = np.array(y)
+X = tf.keras.utils.to_categorical(X, num_classes=len(chars))
+
+# Model
+model = Sequential([
+    SimpleRNN(32, input_shape=(seq_length, len(chars))),
+    Dense(len(chars), activation='softmax')
+])
+
+model.compile(loss='sparse_categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+model.fit(X, y, epochs=200, verbose=0)
+
+# Generate text prediction
+seed = "hel"
+input_seq = np.array([[char_to_idx[c] for c in seed]])
+input_seq = tf.keras.utils.to_categorical(input_seq, num_classes=len(chars))
+pred = model.predict(input_seq)
+predicted_char = idx_to_char[np.argmax(pred)]
+print(f"Next char prediction after '{seed}': {predicted_char}")
