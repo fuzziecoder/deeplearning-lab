@@ -1,34 +1,70 @@
 import numpy as np
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
-from tensorflow.keras.utils import to_categorical
+import matplotlib.pyplot as plt
+from sklearn.datasets import fetch_lfw_people
 from sklearn.model_selection import train_test_split
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.optimizers import Adam
+lfw_dataset = fetch_lfw_people(min_faces_per_person=50, resize=0.4)
 
-# Example: Generate dummy face data (replace with real dataset)
-num_classes = 3
-num_samples = 300
-img_height, img_width = 32, 32
+X = lfw_dataset.images
+y = lfw_dataset.target
+target_names = lfw_dataset.target_names
+num_classes = len(target_names)
 
-X = np.random.rand(num_samples, img_height, img_width, 1)  # Grayscale faces
-y = np.repeat(np.arange(num_classes), num_samples//num_classes)
+print("Number of classes:", num_classes)
+print("Image shape:", X.shape)
+X = X / 255.0
+X = X.reshape(-1, X.shape[1], X.shape[2], 1) 
 y_cat = to_categorical(y, num_classes)
-
-# Split data
 X_train, X_test, y_train, y_test = train_test_split(X, y_cat, test_size=0.2, random_state=42)
-
-# Build CNN model
 model = Sequential([
-    Conv2D(32, (3,3), activation='relu', input_shape=(img_height, img_width, 1)),
-    MaxPooling2D((2,2)),
+    Conv2D(32, (3, 3), activation='relu', input_shape=(X.shape[1], X.shape[2], 1)),
+    MaxPooling2D((2, 2)),
+    Conv2D(64, (3, 3), activation='relu'),
+    MaxPooling2D((2, 2)),
     Flatten(),
-    Dense(64, activation='relu'),
+    Dense(128, activation='relu'),
+    Dropout(0.5),
     Dense(num_classes, activation='softmax')
 ])
+model.compile(optimizer=Adam(learning_rate=0.001),
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
 
-model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-model.fit(X_train, y_train, epochs=5, batch_size=16, validation_data=(X_test, y_test))
+history = model.fit(X_train, y_train,
+                    epochs=10,
+                    batch_size=32,
+                    validation_data=(X_test, y_test))
+loss, accuracy = model.evaluate(X_test, y_test)
+print("Test accuracy:", accuracy)
+plt.figure(figsize=(12, 4))
+plt.subplot(1, 2, 1)
+plt.plot(history.history['accuracy'], label='train')
+plt.plot(history.history['val_accuracy'], label='val')
+plt.title('Model Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.subplot(1, 2, 2)
+plt.plot(history.history['loss'], label='train')
+plt.plot(history.history['val_loss'], label='val')
+plt.title('Model Loss')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
 
-# Evaluate
-loss, acc = model.evaluate(X_test, y_test)
-print("Test Accuracy:", acc)
+plt.show()
+sample_index = np.random.randint(0, len(X_test))
+sample_image = X_test[sample_index]
+sample_label = y_test[sample_index]
+
+prediction = model.predict(np.expand_dims(sample_image, axis=0))
+predicted_class = target_names[np.argmax(prediction)]
+true_class = target_names[np.argmax(sample_label)]
+
+plt.imshow(sample_image.squeeze(), cmap='gray')
+plt.title(f"True: {true_class}\nPredicted: {predicted_class}")
+plt.axis('off')
+plt.show()
